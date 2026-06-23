@@ -1,0 +1,51 @@
+
+import pandas as pd
+from datetime import datetime
+
+# TÜM SÜTUNLARI GÖSTER
+pd.set_option('display.max_columns', None)
+
+# Excel oku
+df = pd.read_excel("stok_verileri.xlsx")
+
+# Tarih formatı
+df["Termin_Tarihi"] = pd.to_datetime(df["Termin_Tarihi"], errors="coerce")
+
+# BUGÜN
+today = datetime.today()
+
+# 🔥 KARŞILANMAYAN MİKTAR
+df["Karsilanmiyan_Miktar"] = df.apply(
+    lambda x: x["Siparis_Bakiyesi"] - (x["Stok_Miktari"] + x["Satinalma_Bakiyesi"])
+    if (x["Stok_Miktari"] + x["Satinalma_Bakiyesi"]) < x["Siparis_Bakiyesi"] else 0,
+    axis=1
+)
+
+# 🔥 İŞ GÜNÜ FARKI (sadece hafta içi)
+def is_gunu_farki(tarih):
+    if pd.isnull(tarih):
+        return 0
+    gunler = pd.bdate_range(start=tarih, end=today)
+    return max(len(gunler) - 1, 0)
+
+df["Gecen_Is_Gunu"] = df["Termin_Tarihi"].apply(is_gunu_farki)
+
+# 🔥 DURUM
+df["Durum"] = df.apply(
+    lambda x: "Acil" if (x["Gecen_Is_Gunu"] > 2 and x["Yüzdelik"] < 0.50) else "Normal",
+    axis=1
+)
+
+# TÜM TABLO
+print("\n--- TUM VERI ---\n")
+print(df.to_string(index=False))
+
+# SADECE ACİL
+print("\n--- ACIL URUNLER ---\n")
+print(df[df["Durum"] == "Acil"].to_string(index=False))
+
+# Excel kaydet
+df.to_excel("stok_analiz_sonuc.xlsx", index=False)
+
+print("\nBitti → stok_analiz_sonuc.xlsx")
+
